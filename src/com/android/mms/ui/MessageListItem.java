@@ -41,6 +41,7 @@ import android.preference.PreferenceManager;
 import android.provider.ContactsContract.Profile;
 import android.provider.Telephony.Sms;
 import android.telephony.PhoneNumberUtils;
+import android.telephony.MSimTelephonyManager;
 import android.telephony.TelephonyManager;
 import android.text.Html;
 import android.text.SpannableStringBuilder;
@@ -210,6 +211,7 @@ public class MessageListItem extends LinearLayout implements
                                 + mContext.getString(R.string.kilobyte);
 
         mBodyTextView.setText(formatMessage(mMessageItem, mMessageItem.mContact, null,
+                                            mMessageItem.mSubscription,
                                             mMessageItem.mSubject,
                                             mMessageItem.mHighlight,
                                             mMessageItem.mTextContentType));
@@ -312,6 +314,7 @@ public class MessageListItem extends LinearLayout implements
         if (formattedMessage == null) {
             formattedMessage = formatMessage(mMessageItem, mMessageItem.mContact,
                                              mMessageItem.mBody,
+                                             mMessageItem.mSubscription,
                                              mMessageItem.mSubject,
                                              mMessageItem.mHighlight,
                                              mMessageItem.mTextContentType);
@@ -502,22 +505,19 @@ public class MessageListItem extends LinearLayout implements
     ForegroundColorSpan mColorSpan = null;  // set in ctor
 
     private CharSequence formatMessage(MessageItem msgItem, String contact, String body,
-                                       String subject, Pattern highlight,
+                                       int subId, String subject, Pattern highlight,
                                        String contentType) {
         SpannableStringBuilder buf = new SpannableStringBuilder();
 
-        SharedPreferences prefs = PreferenceManager
-                .getDefaultSharedPreferences(mContext);
-        boolean enableEmojis = prefs.getBoolean(MessagingPreferenceActivity.ENABLE_EMOJIS, false);
+        if (MSimTelephonyManager.getDefault().isMultiSimEnabled()) {
+            buf.append( (subId == 0) ? "SUB1:" : "SUB2:");
+            buf.append("\n");
+        }
 
         boolean hasSubject = !TextUtils.isEmpty(subject);
         SmileyParser parser = SmileyParser.getInstance();
         if (hasSubject) {
             CharSequence smilizedSubject = parser.addSmileySpans(subject);
-            if (enableEmojis) {
-                EmojiParser emojiParser = EmojiParser.getInstance();
-                smilizedSubject = emojiParser.addEmojiSpans(smilizedSubject);
-            }
             // Can't use the normal getString() with extra arguments for string replacement
             // because it doesn't preserve the SpannableText returned by addSmileySpans.
             // We have to manually replace the %s with our text.
@@ -534,12 +534,7 @@ public class MessageListItem extends LinearLayout implements
                 if (hasSubject) {
                     buf.append(" - ");
                 }
-                CharSequence smileyBody = parser.addSmileySpans(body);
-                if (enableEmojis) {
-                    EmojiParser emojiParser = EmojiParser.getInstance();
-                    smileyBody = emojiParser.addEmojiSpans(smileyBody);
-                }
-                buf.append(smileyBody);
+                buf.append(parser.addSmileySpans(body));
             }
         }
 
